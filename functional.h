@@ -104,4 +104,36 @@ public:
 	}
 };
 
+template<typename Signature> struct call;
+template<typename Func, typename... Args> struct call<Func(Args...)>
+{
+private:
+	typedef Func (*const functor_t)(void *const, Args...args);
+	const functor_t functor;
+
+	template<class Class, Func (Class::* const ptr)(Args...)>
+	constexpr static Func stub(void *const objectPtr, Args... args) noexcept
+	{
+		return (static_cast<Class *const>(objectPtr)->* ptr)(forward<Args>(args)...);
+	}
+
+	constexpr call(functor_t call) noexcept : functor(call) { }
+
+public:
+	call() = delete;
+	constexpr call(const call &c) noexcept : functor(c.functor) { }
+	constexpr call(call &&c) noexcept : functor(c.functor) { }
+
+	template<class Class, Func (Class::* const ptr)(Args...)>
+	constexpr static call make() noexcept
+	{
+		return call(stub<Class, ptr>);
+	}
+
+	Func operator()(void *const object, Args... args) const noexcept
+	{
+		return functor(object, forward<Args>(args)...);
+	}
+};
+
 #endif /*__FUNCTIONAL_H__*/
