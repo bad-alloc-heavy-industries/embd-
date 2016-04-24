@@ -132,6 +132,11 @@ public:
 	void operator ()(outDev &dev) noexcept { format<N>(dev); }
 };
 
+template<typename> struct isChar : falseType { };
+template<> struct isChar<char> : trueType { };
+template<typename T> struct isScalar : public integralConstant<bool,
+	isIntegral<T>::value && !isBoolean<T>::value && !isChar<T>::value> { };
+
 struct stdout_t
 {
 private:
@@ -139,16 +144,25 @@ private:
 
 	void print(const char *value) noexcept { dev.write(value); }
 	/*void print(function<void(outDev &)> callable) noexcept { callable(dev); }*/
+	void print(const char value) noexcept { dev.write(value); }
 
 	template<typename T> typename enableIf<isBaseOf<printable_t, T>::value>::type
 		print(T &printable) noexcept { printable(dev); }
 
-	template<typename T> typename enableIf<isIntegral<T>::value && !isBoolean<T>::value>::type
+	template<typename T> typename enableIf<isScalar<T>::value>::type
 		print(T &num) noexcept { write(asInt<T>(num)); }
 
 	template<typename T> void print(T *ptr) noexcept
 	{
 		write("0x", asHex<8, '0'>((const long)ptr));
+	}
+
+	void print(const bool value) noexcept
+	{
+		if (value)
+			dev.write("true");
+		else
+			dev.write("false");
 	}
 
 	template<typename T, size_t N> void print(array<T, N> &arr) noexcept
