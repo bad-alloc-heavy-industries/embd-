@@ -9,22 +9,19 @@
 struct outDev
 {
 protected:
-	typedef const call<void()> init_t;
-	typedef const call<void(const char c)> writeChar_t;
-	typedef const call<void(const char *str)> writeString_t;
+	typedef const call<void(const uint32_t baud)> init_t;
+	typedef const call<void(const char c)> write_t;
 
 	struct functions
 	{
 	public:
 		const init_t init;
-		const writeChar_t writeChar;
-		const writeString_t writeString;
+		const write_t write;
 
 		functions() = delete;
-		constexpr functions(functions &&fns) noexcept : init(fns.init), writeChar(fns.writeChar), writeString(fns.writeString) { }
-		constexpr functions(const functions &fns) noexcept : init(fns.init), writeChar(fns.writeChar), writeString(fns.writeString) { }
-		constexpr functions(const init_t initFn, const writeChar_t writeCharFn, const writeString_t writeStringFn) noexcept :
-			init(initFn), writeChar(writeCharFn), writeString(writeStringFn) { }
+		constexpr functions(functions &&fns) noexcept : init(fns.init), write(fns.write) { }
+		constexpr functions(const functions &fns) noexcept : init(fns.init), write(fns.write) { }
+		constexpr functions(const init_t initFn, const write_t writeFn) noexcept : init(initFn), write(writeFn) { }
 	};
 	const functions *const vtable;
 	void *const instance;
@@ -32,9 +29,13 @@ protected:
 	constexpr outDev(const functions *const table, void *const inst) noexcept : vtable(table), instance(inst) { }
 
 public:
-	void init() noexcept { vtable->init(instance); }
-	void write(const char c) noexcept { vtable->writeChar(instance, c); }
-	void write(const char *str) noexcept { vtable->writeString(instance, str); }
+	void init(const uint32_t baud) noexcept { vtable->init(instance, baud); }
+	void write(const char c) noexcept { vtable->write(instance, c); }
+	void write(const char *str) noexcept
+	{
+		while (*str != 0)
+			vtable->write(instance, *str++);
+	}
 };
 
 struct printable_t { };
@@ -168,12 +169,12 @@ private:
 	template<typename T, size_t N> void print(array<T, N> &arr) noexcept
 	{
 		for (auto &elem : arr)
-			write(elem);
+			write(asHex<sizeof(T) * 2, '0'>(elem));
 	}
 
 public:
 	constexpr stdout_t(outDev &device) noexcept : dev(device) { }
-	void init() noexcept { dev.init(); }
+	void init(const uint32_t baud) noexcept { dev.init(baud); }
 	stdout_t &write() noexcept { return *this; }
 
 	template<typename T, typename... U> stdout_t &write(T value, U... values) noexcept
